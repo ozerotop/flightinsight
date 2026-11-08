@@ -1,0 +1,2 @@
+# Python dependencies will be added during implementation.
+# Target: Python 3.11+
