@@ -1,0 +1,18 @@
+# Keep local secrets, data and VCS metadata out of the Docker build context.
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+.venv
+venv
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.vscode
+.idea
+data/raw
+data/processed
+**/*.csv
+**/*.zip
+*.log

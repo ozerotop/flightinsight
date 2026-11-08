@@ -1,2 +1,2 @@
-# Python dependencies will be added during implementation.
-# Target: Python 3.11+
+# Database adapter for the ETL container. API/dashboard dependencies arrive later.
+psycopg[binary]==3.3.6

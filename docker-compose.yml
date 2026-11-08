@@ -1,4 +1,4 @@
-# Stage 3 starts only PostgreSQL. API and dashboard are added in later stages.
+# Stage 4: PostgreSQL and optional ETL importer. API and dashboard arrive later.
 services:
   postgres:
     image: postgres:17-alpine
@@ -18,6 +18,26 @@ services:
       timeout: 3s
       retries: 15
       start_period: 10s
+
+
+  # Optional one-shot importer; explicitly run with:
+  # docker compose run --build --rm etl
+  etl:
+    profiles: ["tools"]
+    build:
+      context: .
+      dockerfile: Dockerfile.etl
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-flightinsight}
+      POSTGRES_USER: ${POSTGRES_USER:-flightinsight}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run python scripts/init_env.py first}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+    volumes:
+      - ./data/raw:/app/data/raw:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   postgres_data:
