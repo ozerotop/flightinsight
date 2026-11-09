@@ -1,0 +1,6 @@
+# API runtime and integration-test dependencies, pinned for repeatable Docker builds.
+-r requirements.txt
+fastapi==0.128.2
+uvicorn==0.48.0
+httpx==0.28.1
+pytest==9.0.2

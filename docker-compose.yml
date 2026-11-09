@@ -1,5 +1,5 @@
-# Stage 5: PostgreSQL, one-shot ETL and read-only SQL analytics.
-# API and Streamlit dashboard will be added in subsequent stages.
+# Stage 6: PostgreSQL, ETL, SQL analytics and read-only FastAPI.
+# Streamlit dashboard is planned for Stage 7.
 services:
   postgres:
     image: postgres:17-alpine
@@ -52,6 +52,30 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-flightinsight}
+      POSTGRES_USER: ${POSTGRES_USER:-flightinsight}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run python scripts/init_env.py first}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=5)"]
+      interval: 15s
+      timeout: 6s
+      retries: 5
+      start_period: 20s
 
 volumes:
   postgres_data:

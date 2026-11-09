@@ -6,8 +6,8 @@ A reproducible flight-reliability analytics project based on real **Bureau of Tr
 
 ## Project status
 
-- **Implemented:** BTS download and data inspection, PostgreSQL schema, Docker Compose, streaming Python ETL with row validation and repeat-import protection, and parameterized SQL analytics with integration checks.
-- **Coming next:** REST API (FastAPI), interactive dashboard (Streamlit + Plotly), end-to-end Docker Compose startup and additional tests.
+- **Implemented:** BTS download and data inspection, PostgreSQL schema, Docker Compose, streaming Python ETL with validation and repeat-import protection, parameterized SQL analytics, and read-only FastAPI REST API with Swagger/OpenAPI and automated tests.
+- **Next:** Streamlit/Plotly dashboard and simplified one-command Docker startup.
 
 ## Data
 
@@ -15,7 +15,7 @@ The dataset is BTS *Reporting Carrier On-Time Performance*, **January–March 20
 
 Source and field definitions: [`docs/data_source.md`](docs/data_source.md) and [`docs/data_dictionary.md`](docs/data_dictionary.md). Data quality results: [`docs/data_quality_report.md`](docs/data_quality_report.md).
 
-## Run the current version (Windows CMD / PowerShell)
+## Set up from a fresh clone (Windows CMD / PowerShell)
 
 **Prerequisites:** Docker Desktop running with Docker Compose v2, Python 3.11+ (for local setup/download helpers), and internet access for the initial download and container build.
 
@@ -47,9 +47,9 @@ docker compose stop postgres
 
 More detailed setup: [`docs/database_setup.md`](docs/database_setup.md). Logical database diagram: [`docs/er_diagram.md`](docs/er_diagram.md). Requirements: [`docs/requirements.md`](docs/requirements.md).
 
-## SQL analytics (current stage)
+## SQL analytics (Stage 5)
 
-Analytics queries are stored in [`database/queries/`](database/queries/) and can be reused by the upcoming API. After importing the BTS data, run:
+Analytics queries are stored in [`database/queries/`](database/queries/) and reused by the FastAPI service. After importing the BTS data, run:
 
 ```bat
 python -m unittest discover -s tests -p "test_analytics.py" -v
@@ -61,7 +61,35 @@ docker compose run --rm analytics python scripts/run_analytics.py summary --expl
 
 Reports accept date, airline, origin, destination and sample-size filters. See [`docs/sql_analytics.md`](docs/sql_analytics.md) for full commands, denominator definitions and performance testing.
 
-## Architecture (planned complete system)
+
+## REST API (Stage 6)
+
+After preparing `.env`, downloading BTS data and loading the PostgreSQL database:
+
+```bat
+docker compose up -d --build api
+```
+
+Open [Swagger UI](http://localhost:8000/docs) to explore endpoints.
+The health endpoint is `http://localhost:8000/health`, with main metrics at
+`http://localhost:8000/api/v1/summary`. These run only on localhost.
+
+Test API contracts in the container (no extra host Python packages needed):
+
+```bat
+docker compose run --build --rm --no-deps api python -m pytest -q tests/test_api.py
+```
+
+Then check the real running API using the Python standard library:
+
+```bat
+python scripts\check_api.py
+```
+
+See [`docs/api.md`](docs/api.md) for request parameters, routes and error rules.
+The API is read-only; the previous SQL and ETL commands remain supported.
+
+## Architecture
 
 ```text
 BTS ZIP/CSV -> Python ETL -> PostgreSQL -> FastAPI -> Streamlit/Plotly
@@ -74,4 +102,4 @@ Current schema: `airlines`, `airports`, `flights`, `import_batches`. Status, del
 - Local secrets are stored in `.env`, generated with a random password and excluded from Git. `.env.example` documents the required settings.
 - Large datasets, Docker volumes, virtual environments and caches are excluded from Git.
 - The import is transactional per source month and can be run again without duplicating flights.
-- A future release will reduce new-user startup to a single Docker Compose command after the API and dashboard are implemented.
+- After Stage 7 adds the dashboard, Stage 8 will simplify clean-machine startup and verify fresh-clone reproducibility.

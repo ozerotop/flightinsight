@@ -1,0 +1,16 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+COPY requirements.txt requirements-api.txt /app/
+RUN pip install --no-cache-dir -r /app/requirements-api.txt
+COPY app/api/ /app/app/api/
+COPY scripts/run_analytics.py /app/scripts/run_analytics.py
+COPY scripts/check_api.py /app/scripts/check_api.py
+COPY database/queries/ /app/database/queries/
+COPY tests/test_api.py /app/tests/test_api.py
+
+EXPOSE 8000
+CMD ["uvicorn", "app.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
