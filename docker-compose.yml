@@ -1,5 +1,4 @@
-# Stage 6: PostgreSQL, ETL, SQL analytics and read-only FastAPI.
-# Streamlit dashboard is planned for Stage 7.
+# Stage 7: PostgreSQL, ETL, SQL analytics, FastAPI and Streamlit/Plotly dashboard.
 services:
   postgres:
     image: postgres:17-alpine
@@ -76,6 +75,26 @@ services:
       timeout: 6s
       retries: 5
       start_period: 20s
+
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+    restart: unless-stopped
+    environment:
+      API_BASE_URL: http://api:8000
+    ports:
+      - "127.0.0.1:8501:8501"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health',timeout=5)"]
+      interval: 15s
+      timeout: 6s
+      retries: 5
+      start_period: 35s
 
 volumes:
   postgres_data:

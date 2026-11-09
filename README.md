@@ -6,8 +6,8 @@ A reproducible flight-reliability analytics project based on real **Bureau of Tr
 
 ## Project status
 
-- **Implemented:** BTS download and data inspection, PostgreSQL schema, Docker Compose, streaming Python ETL with validation and repeat-import protection, parameterized SQL analytics, and read-only FastAPI REST API with Swagger/OpenAPI and automated tests.
-- **Next:** Streamlit/Plotly dashboard and simplified one-command Docker startup.
+- **Implemented:** BTS download and data inspection, PostgreSQL schema, Docker Compose, streaming Python ETL with validation and repeat-import protection, parameterized SQL analytics, read-only FastAPI REST API, and Streamlit/Plotly dashboard with filters and CSV export.
+- **Next:** verify fresh-clone startup and simplify it to one command in Stage 8.
 
 ## Data
 
@@ -89,6 +89,45 @@ python scripts\check_api.py
 See [`docs/api.md`](docs/api.md) for request parameters, routes and error rules.
 The API is read-only; the previous SQL and ETL commands remain supported.
 
+
+## Interactive dashboard (Stage 7)
+
+Once the original BTS archives have been imported (setup above), start the web
+application together with the API:
+
+```bat
+docker compose up -d --build api dashboard
+python scripts\check_dashboard.py
+```
+
+Open **http://localhost:8501** in a browser. The application shows verified
+arrival-delay and cancellation metrics, airline and airport rankings, daily
+trends, day-of-week and local departure-hour patterns, and cancellation/delay
+causes. Filters cover January–March 2025, airline, origin/destination airport,
+and minimum sample size. Each report offers a CSV download.
+
+The dashboard calls **FastAPI via Docker's internal hostname** `api:8000`;
+it does **not** read PostgreSQL or require database passwords. The first
+request can take a few seconds while PostgreSQL calculates metrics over
+1.6 million flights; results are cached briefly in Streamlit.
+
+Run dependency-free unit tests for dashboard helpers:
+
+```bat
+python -m unittest discover -s tests -p "test_dashboard.py" -v
+```
+
+For an empty database, follow the import instructions in the Data section
+above. To investigate an unavailable dashboard, use:
+
+```bat
+docker compose ps
+docker compose logs --tail=80 dashboard
+```
+
+**Important:** this stage still requires the initial Python helpers to create
+`.env` and download data. Stage 8 will automate fresh-clone setup.
+
 ## Architecture
 
 ```text
@@ -102,4 +141,4 @@ Current schema: `airlines`, `airports`, `flights`, `import_batches`. Status, del
 - Local secrets are stored in `.env`, generated with a random password and excluded from Git. `.env.example` documents the required settings.
 - Large datasets, Docker volumes, virtual environments and caches are excluded from Git.
 - The import is transactional per source month and can be run again without duplicating flights.
-- After Stage 7 adds the dashboard, Stage 8 will simplify clean-machine startup and verify fresh-clone reproducibility.
+- Stage 8 will simplify clean-machine startup and verify fresh-clone reproducibility.
