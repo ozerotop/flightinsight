@@ -1,144 +1,123 @@
 # FlightInsight
 
-A reproducible flight-reliability analytics project based on real **Bureau of Transportation Statistics (BTS)** U.S. domestic flight data.
+**FlightInsight** is a reproducible flight-reliability analytics web service built with real [Bureau of Transportation Statistics (BTS)](https://www.transtats.bts.gov/) U.S. domestic flight data.
 
-**Use case:** help teams compare historical flight punctuality and cancellation patterns across airlines, airports and time intervals. Historical patterns are not guarantees for future flights.
+It helps explore **historical** airline/airport punctuality, cancellations, arrival delays, and time-of-day patterns. Historical trends are not predictions or guarantees for future flights.
 
-## Project status
+**Dataset:** January–March 2025, **1,645,503** flight records. Large source ZIPs are downloaded from BTS on first run and are **not committed to Git**.
 
-- **Implemented:** BTS download and data inspection, PostgreSQL schema, Docker Compose, streaming Python ETL with validation and repeat-import protection, parameterized SQL analytics, read-only FastAPI REST API, and Streamlit/Plotly dashboard with filters and CSV export.
-- **Next:** verify fresh-clone startup and simplify it to one command in Stage 8.
+## Quick start — from a fresh GitHub clone
 
-## Data
+**Prerequisites:** Git, Docker Desktop (Windows/macOS) or Docker Engine with Compose v2 (Linux), internet access and sufficient disk space. Ensure Docker is started and using Linux containers. **Host Python is not required.**
 
-The dataset is BTS *Reporting Carrier On-Time Performance*, **January–March 2025** (1,645,503 flight records). The large ZIP files are **not** included in Git. Scripts download the originals from the official BTS site, and the ETL reads them directly without extraction.
-
-Source and field definitions: [`docs/data_source.md`](docs/data_source.md) and [`docs/data_dictionary.md`](docs/data_dictionary.md). Data quality results: [`docs/data_quality_report.md`](docs/data_quality_report.md).
-
-## Set up from a fresh clone (Windows CMD / PowerShell)
-
-**Prerequisites:** Docker Desktop running with Docker Compose v2, Python 3.11+ (for local setup/download helpers), and internet access for the initial download and container build.
+### Windows CMD or PowerShell
 
 ```bat
 git clone https://github.com/ozerotop/flightinsight.git
 cd flightinsight
-python scripts\init_env.py
-python scripts\download_bts.py
-docker compose up -d postgres
-docker compose run --build --rm etl
-python scripts\check_import.py
+start.cmd
 ```
 
-The importer uses Python 3.12 **inside Docker**, so you do not have to install Python database libraries on your computer. The first run downloads the BTS archives and populates PostgreSQL; subsequent ETL runs skip already imported sources.
+In PowerShell, run `./start.cmd` instead of `start.cmd` if needed.
 
-Run the standard-library ETL unit tests on the host:
+### Linux / macOS
 
-```bat
-python -m unittest discover -s tests -p "test_import_flights.py" -v
+```bash
+git clone https://github.com/ozerotop/flightinsight.git
+cd flightinsight
+bash start.sh
 ```
 
-To stop PostgreSQL without deleting data:
+The launcher uses a temporary official Python Docker image to create a **random local database password** in ignored `.env` and download the three official BTS ZIPs. It then initializes PostgreSQL, runs the transactional ETL and launches the API/dashboard, waiting for health checks. The end-to-end API smoke check validates expected Q1 2025 counts.
 
-```bat
-docker compose stop postgres
-```
+**Open the app:** http://localhost:8501  
+**Explore API/Swagger:** http://localhost:8000/docs
 
-> Do **not** run `docker compose down -v` unless you deliberately want to delete all stored PostgreSQL data.
+Initial setup requires network downloads and the import of 1.6 million records. Once the archives and database volume exist, rerunning the same launcher should safely reuse them.
 
-More detailed setup: [`docs/database_setup.md`](docs/database_setup.md). Logical database diagram: [`docs/er_diagram.md`](docs/er_diagram.md). Requirements: [`docs/requirements.md`](docs/requirements.md).
+## Features
 
-## SQL analytics (Stage 5)
+- Validated, streaming ETL from compressed BTS CSVs into PostgreSQL, with import batch logs and duplicate prevention.
+- Relational entities: `airlines`, `airports`, `flights`, `import_batches`.
+- SQL analytics with CTEs, aggregation, medians and window functions, plus `EXPLAIN ANALYZE` checks.
+- Read-only FastAPI with OpenAPI/Swagger and parameterized filters.
+- Streamlit/Plotly dashboard covering overview, airlines, airports, time patterns and disruptions.
+- CSV report exports, date/route/airline filters, minimum sample-size controls.
+- Docker Compose and Python tests.
 
-Analytics queries are stored in [`database/queries/`](database/queries/) and reused by the FastAPI service. After importing the BTS data, run:
-
-```bat
-python -m unittest discover -s tests -p "test_analytics.py" -v
-docker compose run --build --rm analytics python scripts/check_analytics.py
-docker compose run --rm analytics python scripts/run_analytics.py summary
-docker compose run --rm analytics python scripts/run_analytics.py airlines --limit 10
-docker compose run --rm analytics python scripts/run_analytics.py summary --explain
-```
-
-Reports accept date, airline, origin, destination and sample-size filters. See [`docs/sql_analytics.md`](docs/sql_analytics.md) for full commands, denominator definitions and performance testing.
-
-
-## REST API (Stage 6)
-
-After preparing `.env`, downloading BTS data and loading the PostgreSQL database:
-
-```bat
-docker compose up -d --build api
-```
-
-Open [Swagger UI](http://localhost:8000/docs) to explore endpoints.
-The health endpoint is `http://localhost:8000/health`, with main metrics at
-`http://localhost:8000/api/v1/summary`. These run only on localhost.
-
-Test API contracts in the container (no extra host Python packages needed):
-
-```bat
-docker compose run --build --rm --no-deps api python -m pytest -q tests/test_api.py
-```
-
-Then check the real running API using the Python standard library:
-
-```bat
-python scripts\check_api.py
-```
-
-See [`docs/api.md`](docs/api.md) for request parameters, routes and error rules.
-The API is read-only; the previous SQL and ETL commands remain supported.
-
-
-## Interactive dashboard (Stage 7)
-
-Once the original BTS archives have been imported (setup above), start the web
-application together with the API:
-
-```bat
-docker compose up -d --build api dashboard
-python scripts\check_dashboard.py
-```
-
-Open **http://localhost:8501** in a browser. The application shows verified
-arrival-delay and cancellation metrics, airline and airport rankings, daily
-trends, day-of-week and local departure-hour patterns, and cancellation/delay
-causes. Filters cover January–March 2025, airline, origin/destination airport,
-and minimum sample size. Each report offers a CSV download.
-
-The dashboard calls **FastAPI via Docker's internal hostname** `api:8000`;
-it does **not** read PostgreSQL or require database passwords. The first
-request can take a few seconds while PostgreSQL calculates metrics over
-1.6 million flights; results are cached briefly in Streamlit.
-
-Run dependency-free unit tests for dashboard helpers:
-
-```bat
-python -m unittest discover -s tests -p "test_dashboard.py" -v
-```
-
-For an empty database, follow the import instructions in the Data section
-above. To investigate an unavailable dashboard, use:
-
-```bat
-docker compose ps
-docker compose logs --tail=80 dashboard
-```
-
-**Important:** this stage still requires the initial Python helpers to create
-`.env` and download data. Stage 8 will automate fresh-clone setup.
+The **delayed** criterion is arrival **15+ minutes after schedule**. Cancelled/diverted flights are reported separately and excluded from arrival punctuality denominators; the average schedule deviation differs from lateness among delayed flights only.
 
 ## Architecture
 
 ```text
-BTS ZIP/CSV -> Python ETL -> PostgreSQL -> FastAPI -> Streamlit/Plotly
+BTS official ZIP/CSV  ->  Python ETL  ->  PostgreSQL  ->  FastAPI  ->  Streamlit / Plotly
+                              |                |           |
+                         data checks       SQL queries   REST / Swagger
 ```
 
-Current schema: `airlines`, `airports`, `flights`, `import_batches`. Status, delay causes and missing values are preserved according to the documented business rules; arrivals delayed **15 or more minutes** are classified as delayed, and cancelled/diverted flights are tracked separately.
+PostgreSQL credentials and original CSV/ZIPs stay local. The dashboard calls FastAPI over Docker's internal network, not the database directly. Services are bound to `127.0.0.1` by default.
 
-## Security and reproducibility
+## Common commands
 
-- Local secrets are stored in `.env`, generated with a random password and excluded from Git. `.env.example` documents the required settings.
-- Large datasets, Docker volumes, virtual environments and caches are excluded from Git.
-- The import is transactional per source month and can be run again without duplicating flights.
-- Stage 8 will simplify clean-machine startup and verify fresh-clone reproducibility.
+From the repository root after first startup:
+
+```bash
+# See service health and container status
+docker compose ps
+
+# Run the same idempotent import again (should skip existing months)
+docker compose run --rm etl
+
+# Verify database aggregates and SQL queries
+docker compose run --rm analytics python scripts/check_analytics.py
+
+# Test the API in its own container
+docker compose run --rm --no-deps api python -m pytest -q tests/test_api.py
+
+# Stop the application without deleting data
+docker compose stop
+
+# Restart without re-importing data
+docker compose up -d --wait api dashboard
+```
+
+Optional end-to-end HTTP checks with **host Python 3.11+**, if installed:
+
+```bash
+python scripts/check_release.py
+```
+
+Or run the container-based API verification with no host Python:
+
+```bash
+docker compose exec -T api python scripts/check_api.py
+```
+
+To run dependency-free Python unit tests on a machine with Python installed:
+
+```bash
+python -m unittest discover -s tests -p "test_release.py" -v
+```
+
+**Do not use `docker compose down -v` or `docker volume prune`** unless you intentionally want to delete the local PostgreSQL database. `docker compose stop` keeps the data volume intact.
+
+## Troubleshooting
+
+- **Docker engine unavailable:** Start Docker Desktop, then run `docker info`; on Windows select Linux containers.
+- **Download failure:** Check access to BTS (official source details in `docs/data_source.md`), then rerun the launcher. For restricted Docker networking, you can run `python scripts/download_bts.py` on the host if Python is available; rerunning the launcher will skip the already downloaded ZIPs.
+- **Port 8000 / 8501 / 5432 in use:** Stop the conflicting service; the default Compose file binds these to localhost only.
+- **DB is empty:** Run `docker compose run --build --rm etl`, then `docker compose exec -T api python scripts/check_api.py`.
+- **Dashboard error:** Use `docker compose ps` and `docker compose logs --tail=80 dashboard api postgres`.
+- **Fresh start:** Delete data only if intended. Existing `.env` is never overwritten by the launcher; keep it with the database volume it belongs to.
+
+## Data, design and tests
+
+- [Requirements](docs/requirements.md) and [BTS data source](docs/data_source.md)
+- [Data dictionary](docs/data_dictionary.md) and [quality report](docs/data_quality_report.md)
+- [ER diagram](docs/er_diagram.md) and [database setup](docs/database_setup.md)
+- [SQL metrics](docs/sql_analytics.md) and [API endpoints](docs/api.md)
+- [Portfolio description and interview preparation](docs/portfolio.md)
+
+## Development status
+
+The ETL, SQL reports, API and dashboard have been exercised on one Windows/Docker Desktop installation with the Q1 2025 dataset. The launchers are provided for repeatability but **must still be validated from a clean clone on another computer** before claiming full cross-platform reproducibility. No files from `data/raw`, `.env`, or Docker volumes belong in GitHub.
