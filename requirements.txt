@@ -1,2 +1,2 @@
 # PostgreSQL driver shared by the ETL, analytics, and API containers.
-psycopg[binary]==3.3.6
+psycopg[binary]==3.3.8
