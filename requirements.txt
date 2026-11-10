@@ -1,2 +1,2 @@
-# Database adapter for the ETL container. API/dashboard dependencies arrive later.
+# PostgreSQL driver shared by the ETL, analytics, and API containers.
 psycopg[binary]==3.3.6

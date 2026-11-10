@@ -11,5 +11,12 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 COPY scripts/import_flights.py /app/scripts/import_flights.py
 COPY scripts/run_analytics.py /app/scripts/run_analytics.py
 COPY scripts/check_analytics.py /app/scripts/check_analytics.py
+COPY scripts/provision_api_role.py /app/scripts/provision_api_role.py
 COPY database/queries/ /app/database/queries/
+# Build as root, run as an unprivileged user (UID/GID 10001).
+RUN groupadd --gid 10001 flightinsight && \
+    useradd --uid 10001 --gid 10001 --create-home --shell /usr/sbin/nologin flightinsight && \
+    chown -R 10001:10001 /app
+USER 10001:10001
+
 CMD ["python", "scripts/import_flights.py"]

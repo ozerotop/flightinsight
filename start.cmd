@@ -42,6 +42,8 @@ if errorlevel 1 goto failed
 echo [VERIFY] Verify API against the expected BTS data...
 docker compose exec -T api python scripts/check_api.py
 if errorlevel 1 goto failed
+docker compose exec -T api python scripts/check_db_permissions.py
+if errorlevel 1 goto failed
 
 echo.
 echo [DONE] FlightInsight is ready.

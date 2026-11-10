@@ -1,78 +1,42 @@
-# FlightInsight — требования MVP
+# FlightInsight — MVP requirements
 
-## 1. Назначение
+## Purpose
+Analyze historical flight punctuality and cancellations for travel planning.
+Historical statistics do not guarantee the reliability of an individual flight.
 
-Анализ исторической пунктуальности авиарейсов
-для поддержки планирования деловых поездок.
+## Source and scope
+Official BTS Reporting Carrier On-Time Performance CSV for January–March 2025.
+The three archives have been inspected: 1,645,503 flight rows, with consistent
+columns and no rejected data rows in the tested source release.
 
-## 2. Источник данных
+## Functional requirements
+- Download and validate the official CSV source data.
+- Import idempotently into a normalized PostgreSQL relational database.
+- Analyze delay rates (arrival 15+ minutes late), medians, average schedule
+  deviations, cancellation/diversion rates, airlines, airports and trends.
+- Filter by dates, airline and origin/destination, and allow CSV export.
+- Serve analytics through validated FastAPI routes and Streamlit dashboard.
+- Expose Swagger/OpenAPI documentation and reproducible Docker startup.
 
-Открытые данные BTS (США).
-Планируемый период: январь–март 2025 года.
+## Metric and data rules
+- Arrival delay >= 15 minutes counts as delayed.
+- Cancelled and diverted flights are excluded from the punctuality denominator.
+- Cancellation percentages are computed from all scheduled flights.
+- Average schedule deviation includes early arrivals as negative values.
+- Mean/median lateness among delayed flights use the late-flight cohort only.
+- Ranking results must display sample size, and delay causes may be NULL.
+- All metrics must reconcile with the verified BTS import counts.
 
-Доступность и структура CSV пока не проверены.
+## Nonfunctional requirements
+- No credentials or large BTS source ZIPs committed to Git.
+- API accesses PostgreSQL through a restricted read-only role.
+- Parameterized SQL and strict filter validation; no data mutation endpoints.
+- Docker builds use non-root runtime users for application containers.
+- Local-only ports by default; production hosting is out of scope.
+- Repeatable startup and tests, without deleting existing PostgreSQL volumes.
 
-## 3. Основные функции
-
-- Импорт CSV с проверкой качества данных.
-- Исключение дублирующихся рейсов.
-- Хранение данных в PostgreSQL.
-- Анализ задержек, отмен и пунктуальности.
-- Сравнение авиакомпаний и аэропортов.
-- Анализ по дням недели и времени суток.
-- Анализ причин задержек при наличии данных.
-- Фильтрация аналитических результатов.
-- REST API и интерактивный дашборд.
-- Экспорт результатов в CSV.
-
-## 4. Бизнес-правила
-
-Задержанный рейс:
-задержка прибытия >= 15 минут.
-
-Для показателей пунктуальности используются
-рейсы, которые не были отменены или перенаправлены
-и имеют известную задержку прибытия.
-
-Доля задержанных:
-количество задержанных / количество подходящих рейсов.
-
-Доля прибывших вовремя:
-количество рейсов с задержкой < 15 минут /
-количество подходящих рейсов.
-
-Доля отмен:
-количество отменённых / количество всех рейсов.
-
-Среднее отклонение от расписания:
-AVG(arrival_delay) по подходящим рейсам.
-Отрицательные значения означают раннее прибытие.
-
-Среднее опоздание задержанных:
-AVG(arrival_delay) только для рейсов
-с задержкой >= 15 минут.
-
-Отменённые и перенаправленные рейсы
-анализируются отдельно.
-
-Для сравнений указывается размер выборки.
-
-Исторические данные не гарантируют
-пунктуальность конкретного будущего рейса.
-
-## 5. Качество
-
-- Без паролей в исходном коде.
-- SQL-запросы с безопасной параметризацией.
-- Повторный импорт без дублирования рейсов.
-- Обработка пустых результатов.
-- Тестирование расчётных показателей.
-- Воспроизводимый запуск через Docker Compose.
-
-## 6. Критерии готовности
-
-Данные загружены из проверенного источника.
-Метрики правильно рассчитываются.
-API и интерфейс работают.
-Тесты проходят.
-Проект запускается по README.
+## Release acceptance
+- New clone starts with Docker Compose and internet access only.
+- Health and API integration checks pass with 1,645,503 BTS flights.
+- All tests pass after any dependency upgrade.
+- Clean-clone execution must still be verified on an independent host.

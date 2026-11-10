@@ -36,6 +36,7 @@ docker compose up -d --build --wait api dashboard
 
 echo '[VERIFY] Verify API against the expected BTS data...'
 docker compose exec -T api python scripts/check_api.py
+docker compose exec -T api python scripts/check_db_permissions.py
 
 printf '\n[DONE] FlightInsight is ready.\n'
 echo 'Dashboard: http://localhost:8501'

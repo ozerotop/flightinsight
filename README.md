@@ -28,7 +28,7 @@ cd flightinsight
 bash start.sh
 ```
 
-The launcher uses a temporary official Python Docker image to create a **random local database password** in ignored `.env` and download the three official BTS ZIPs. It then initializes PostgreSQL, runs the transactional ETL and launches the API/dashboard, waiting for health checks. The end-to-end API smoke check validates expected Q1 2025 counts.
+The launcher uses a temporary official Python Docker image to create a **two independent random local database passwords** in ignored `.env` and download the three official BTS ZIPs. It then initializes PostgreSQL, runs the transactional ETL and launches the API/dashboard, waiting for health checks. The end-to-end API smoke check validates expected Q1 2025 counts.
 
 **Open the app:** http://localhost:8501  
 **Explore API/Swagger:** http://localhost:8000/docs
@@ -55,7 +55,11 @@ BTS official ZIP/CSV  ->  Python ETL  ->  PostgreSQL  ->  FastAPI  ->  Streamlit
                          data checks       SQL queries   REST / Swagger
 ```
 
-PostgreSQL credentials and original CSV/ZIPs stay local. The dashboard calls FastAPI over Docker's internal network, not the database directly. Services are bound to `127.0.0.1` by default.
+PostgreSQL credentials and original CSV/ZIPs stay local. The API uses a dedicated
+PostgreSQL reader role with `SELECT` grants on `flights`, `airlines` and `airports`
+only; ETL uses the privileged importer account. Docker API, dashboard and helper
+containers run as non-root with Linux capabilities dropped. The one-shot `db-roles`
+service is safe to rerun against a previously imported database. The dashboard calls FastAPI over Docker's internal network, not the database directly. Services are bound to `127.0.0.1` by default.
 
 ## Common commands
 
@@ -91,6 +95,7 @@ Or run the container-based API verification with no host Python:
 
 ```bash
 docker compose exec -T api python scripts/check_api.py
+docker compose exec -T api python scripts/check_db_permissions.py
 ```
 
 To run dependency-free Python unit tests on a machine with Python installed:
@@ -106,7 +111,8 @@ python -m unittest discover -s tests -p "test_release.py" -v
 - **Docker engine unavailable:** Start Docker Desktop, then run `docker info`; on Windows select Linux containers.
 - **Download failure:** Check access to BTS (official source details in `docs/data_source.md`), then rerun the launcher. For restricted Docker networking, you can run `python scripts/download_bts.py` on the host if Python is available; rerunning the launcher will skip the already downloaded ZIPs.
 - **Port 8000 / 8501 / 5432 in use:** Stop the conflicting service; the default Compose file binds these to localhost only.
-- **DB is empty:** Run `docker compose run --build --rm etl`, then `docker compose exec -T api python scripts/check_api.py`.
+- **DB is empty:** Run `docker compose run --build --rm etl`, then `docker compose exec -T api python scripts/check_api.py
+docker compose exec -T api python scripts/check_db_permissions.py`.
 - **Dashboard error:** Use `docker compose ps` and `docker compose logs --tail=80 dashboard api postgres`.
 - **Fresh start:** Delete data only if intended. Existing `.env` is never overwritten by the launcher; keep it with the database volume it belongs to.
 
@@ -121,3 +127,19 @@ python -m unittest discover -s tests -p "test_release.py" -v
 ## Development status
 
 The ETL, SQL reports, API and dashboard have been exercised on one Windows/Docker Desktop installation with the Q1 2025 dataset. The launchers are provided for repeatability but **must still be validated from a clean clone on another computer** before claiming full cross-platform reproducibility. No files from `data/raw`, `.env`, or Docker volumes belong in GitHub.
+
+## Security and contribution policy
+
+Run **only on a trusted local computer**. The dashboard, API and PostgreSQL bind
+to `127.0.0.1` by default; this configuration has **no user authentication** and
+is **not hardened for exposure to the public internet**. See
+[security notes](docs/security.md). Do not commit `.env` or source data archives.
+
+A previous local installation's `.env` is upgraded in-place with the reader
+password; its existing admin password is preserved. The new Docker Compose
+`db-roles` job then grants read-only access without recreating the database.
+After upgrading, use `start.cmd` or `bash start.sh` again.
+
+The code is licensed under the MIT License, which allows third parties to use,
+modify and redistribute it subject to the license notice. GitHub Dependabot
+proposes dependency updates for review; it does not apply them automatically.

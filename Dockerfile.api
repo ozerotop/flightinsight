@@ -9,8 +9,15 @@ RUN pip install --no-cache-dir -r /app/requirements-api.txt
 COPY app/api/ /app/app/api/
 COPY scripts/run_analytics.py /app/scripts/run_analytics.py
 COPY scripts/check_api.py /app/scripts/check_api.py
+COPY scripts/check_db_permissions.py /app/scripts/check_db_permissions.py
 COPY database/queries/ /app/database/queries/
 COPY tests/test_api.py /app/tests/test_api.py
+
+# Build as root, run as an unprivileged user (UID/GID 10001).
+RUN groupadd --gid 10001 flightinsight && \
+    useradd --uid 10001 --gid 10001 --create-home --shell /usr/sbin/nologin flightinsight && \
+    chown -R 10001:10001 /app
+USER 10001:10001
 
 EXPOSE 8000
 CMD ["uvicorn", "app.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
